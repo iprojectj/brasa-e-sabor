@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - Doação</title>
+    <script src="qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        #qrcode {
+            margin: 20px auto;
+            width: 256px;
+            height: 256px;
+        }
+        .pix-code {
+            margin-top: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>Finalize sua Doação</h1>
+    <p>Escaneie o QR Code abaixo ou copie o código PIX para efetuar o pagamento.</p>
+
+    <div id="qrcode"></div>
+    <div class="pix-code" id="pixCode"></div>
+
+    <script>
+        async function gerarPix() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const amount = urlParams.get('amount');
+
+            if (!amount) {
+                document.body.innerHTML = '<h2>Valor da doação não informado.</h2>';
+                return;
+            }
+
+            try {
+                // 🔹 Alteração mínima: troca do arquivo PHP chamado
+                const apiUrl = `invictus.php?amount=${amount}`;
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                if (data && data.data && data.data.pix && data.data.pix.qr_code) {
+                    const qrCodeText = data.data.pix.qr_code;
+                    const transactionHash = data.data.hash;
+
+                    new QRCode(document.getElementById("qrcode"), qrCodeText);
+                    document.getElementById("pixCode").innerText = qrCodeText;
+
+                    // Verificação de pagamento
+                    verificarPagamento(transactionHash);
+                } else {
+                    document.body.innerHTML = '<h2>Erro ao gerar QR Code PIX.</h2>';
+                }
+            } catch (error) {
+                console.error(error);
+                document.body.innerHTML = '<h2>Erro ao conectar ao servidor.</h2>';
+            }
+        }
+
+        async function verificarPagamento(transactionHash) {
+            const intervalo = setInterval(async () => {
+                try {
+                    // 🔹 Alteração mínima: troca do arquivo PHP chamado
+                    const r = await fetch(`invictus_status.php?transaction_hash=${encodeURIComponent(transactionHash)}`);
+                    const statusData = await r.json();
+
+                    if (statusData && statusData.data && statusData.data.status === "paid") {
+                        clearInterval(intervalo);
+                        alert("Pagamento confirmado! Obrigado pela sua doação.");
+                        window.location.href = "index.html";
+                    }
+                } catch (err) {
+                    console.error("Erro ao verificar status:", err);
+                }
+            }, 5000); // verifica a cada 5 segundos
+        }
+
+        gerarPix();
+    </script>
+</body>
+</html>
